@@ -1,62 +1,37 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\V1\GameController;
-use App\Http\Controllers\Api\V1\BannerController;
-use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Bank\BankController;
+use App\Http\Controllers\Api\V1\BannerController;
+use App\Http\Controllers\Api\V1\LaravelBackendController;
 use App\Http\Controllers\Api\V1\PromotionController;
-use App\Http\Controllers\Api\V1\Player\WalletController;
-use App\Http\Controllers\Api\V1\Player\DepositController;
-use App\Http\Controllers\Api\V1\Player\PlayerTransactionLogController;
-use App\Http\Controllers\Api\V1\Player\WithDrawController;
-use App\Http\Controllers\Api\V1\User\GameController as UserGameController;
-use App\Http\Controllers\Api\V1\User\PlayerTransfer\PlayerTransferToGameWalletController;
+use Illuminate\Support\Facades\Route;
 
-//login route post
-Route::post('/login', [AuthController::class, 'login']);
+// Local CMS content remains in AsiaSlot.
 Route::get('promotion', [PromotionController::class, 'index']);
 Route::get('banner', [BannerController::class, 'index']);
-Route::get('hotgame', [GameController::class, 'hotgame']);
-Route::get('providers', [GameController::class, 'providers']);
-Route::get('/gameTypes', [UserGameController::class, 'gameTypes']);
-Route::get('/gameTypeProviders/{id}', [UserGameController::class, 'gameTypeProviders']);
-Route::get('v1/validate',[AuthController::class,'callback']);
 
+// Player identity, catalog, launch, balance and transaction authority now come
+// exclusively from laravelBackend. Protected operations forward the caller's
+// Bearer JWT; AsiaSlot no longer authenticates them against its local Sanctum DB.
+Route::post('login', [LaravelBackendController::class, 'login']);
+Route::post('logout', [LaravelBackendController::class, 'logout']);
+Route::get('user', [LaravelBackendController::class, 'user']);
+Route::post('profile', [LaravelBackendController::class, 'user']);
 
-Route::group(["middleware" => ['auth:sanctum']], function () {
-    //logout
-    Route::get('user', [AuthController::class, 'getUser']);
-    Route::post('logout', [AuthController::class, 'logout']);
-    Route::post('changePassword', [AuthController::class, 'changePassword']);
-    Route::post('profile', [AuthController::class, 'profile']);
+Route::get('providers', [LaravelBackendController::class, 'providers']);
+Route::get('gameTypes', [LaravelBackendController::class, 'categories']);
+Route::get('gameTypeProviders/{id}', [LaravelBackendController::class, 'providers']);
+Route::get('gamelist', [LaravelBackendController::class, 'games']);
+Route::get('hotgame', [LaravelBackendController::class, 'games']);
+Route::get('gamedetail/{provider}/game_type/{category}', [LaravelBackendController::class, 'gameDetail']);
+Route::get('game/{name}', [LaravelBackendController::class, 'game']);
+Route::get('launchGame/{name}', [LaravelBackendController::class, 'launch'])->name('user.launchGame');
 
-    //game lists
-    Route::get('/gamedetail/{provider_id}/game_type/{game_type_id}', [GameController::class, 'getGameDetail']);
-    Route::get('gamelist', [GameController::class, 'gameList']);
-    Route::get('game-log',[GameController::class,'gameLog']);
+Route::get('wallet/currentWallet', [LaravelBackendController::class, 'balance']);
+Route::get('game-log', [LaravelBackendController::class, 'transactions']);
+Route::get('transaction/player-transactionlog', [LaravelBackendController::class, 'transactions']);
+Route::post('transaction/deposit', [LaravelBackendController::class, 'deposit']);
+Route::post('transaction/withdraw', [LaravelBackendController::class, 'withdraw']);
 
-    Route::get('/launchGame/{id}', [GameController::class, 'launchGame'])->name('user.launchGame');
-    Route::get(
-        '/directGame/{provider_id}/game_type/{game_type_id}',
-        [GameController::class, 'directGame']
-    )->name('user.directGame');
-    //lists
-    Route::group(['prefix' => 'wallet'], function () {
-        Route::get('currentWallet', [WalletController::class, 'currentWallet']);
-        Route::post('exchangeToMain', [WalletController::class, 'exchangeToMain']);
-    });
-
-    Route::group(['prefix' => 'transaction'], function () {
-        Route::post('deposit', [DepositController::class, 'deposit']);
-        Route::post('withdraw',[WithDrawController::class,'withdraw']);
-        Route::get('player-transactionlog',[PlayerTransactionLogController::class,'index']);
-        //amk transaction route
-        Route::post('/play-slot-game', [PlayerTransferToGameWalletController::class, 'playSlotGame'])
-            ->name('play-slot-game');
-    });
-
-    Route::group(['prefix' => 'bank'], function () {
-        Route::get('all', [BankController::class, 'all']);
-    });
-});
+// Bank display data is AsiaSlot CMS data; it does not mutate player balance.
+Route::get('bank/all', [BankController::class, 'all']);
